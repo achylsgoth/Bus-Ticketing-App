@@ -1,8 +1,40 @@
 # authentication/serializers.py
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.contrib.auth import authenticate
 from rest_framework import serializers
+from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.password_validation import validate_password
 from .models import User
 
+class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
+    # Change the default username field to email
+    username_field = 'email'
+
+    def validate(self, attrs):
+        # This will now use 'email' instead of 'username'
+        authenticate_kwargs = {
+            self.username_field: attrs[self.username_field],
+            'password': attrs['password'],
+        }
+        try:
+            authenticate_kwargs['request'] = self.context['request']
+        except KeyError:
+            pass
+
+        self.user = authenticate(**authenticate_kwargs)
+
+        if not self.user:
+            raise serializers.ValidationError(
+                _('No active account found with the given credentials'),
+            )
+
+        data = {}
+        refresh = self.get_token(self.user)
+
+        data['refresh'] = str(refresh)
+        data['access'] = str(refresh.access_token)
+
+        return data
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True)

@@ -1,4 +1,6 @@
 # authentication/views.py
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import EmailTokenObtainPairSerializer
 from rest_framework import generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from .models import User
@@ -15,3 +17,6 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     
     def get_object(self):
         return self.request.user
+    
+class EmailTokenObtainPairView(TokenObtainPairView):
+    serializer_class = EmailTokenObtainPairSerializer
