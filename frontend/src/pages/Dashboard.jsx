@@ -1,101 +1,74 @@
-// src/pages/Dashboard.jsx
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import SearchForm from '../components/SearchForm';
-import axios from '../config/axios';
+import api from '../api';
 
 const Dashboard = () => {
-  const { user } = useAuth();
-  const [upcomingBookings, setUpcomingBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(null);
+    const [data, setData] = useState([]);
 
-  useEffect(() => {
-    fetchUpcomingBookings();
-  }, []);
+    useEffect(() => {
+        const fetchUser = async () => {
+            try {
+                const res = await api.get('/auth/users/me/');
+                setUser(res.data);
+                fetchData(res.data.role);
+            } catch (error) {
+                console.error('Fetch user failed', error);
+            }
+        };
+        fetchUser();
+    }, []);
 
-  const fetchUpcomingBookings = async () => {
-    try {
-      const response = await axios.get('/bookings/');
-      const bookings = response.data.filter(booking => 
-        booking.booking_status === 'confirmed'
-      ).slice(0, 3);
-      setUpcomingBookings(bookings);
-    } catch (error) {
-      console.error('Failed to fetch bookings:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchData = async (role) => {
+        try {
+            if (role === 'company') {
+                const res = await api.get('/api/buses/'); // Should filter by owner in backend
+                setData(res.data);
+            } else {
+                const res = await api.get('/api/bookings/');
+                setData(res.data);
+            }
+        } catch (error) {
+            console.error('Fetch data failed', error);
+        }
+    };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString();
-  };
+    if (!user) return <div className="text-center mt-10">Loading...</div>;
 
-  return (
-    <div className="space-y-8">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Welcome back, {user?.first_name || user?.username}!
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Book your next bus trip with CityConnect
-        </p>
-      </div>
-
-      <SearchForm />
-
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold mb-4 text-gray-800">Upcoming Trips</h2>
-        {loading ? (
-          <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        ) : upcomingBookings.length > 0 ? (
-          <div className="space-y-4">
-            {upcomingBookings.map(booking => (
-              <div key={booking.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-semibold">
-                      {booking.schedule_details.route_details.origin} → {booking.schedule_details.route_details.destination}
-                    </h3>
-                    <p className="text-gray-600">
-                      {formatDate(booking.schedule_details.departure_time)} • {booking.number_of_seats} seat(s)
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold">${booking.total_fare}</p>
-                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
-                      {booking.booking_status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-            <div className="text-center mt-4">
-              <Link
-                to="/my-bookings"
-                className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
-              >
-                View all bookings →
-              </Link>
+    return (
+        <div className="container mx-auto p-4">
+            <h1 className="text-3xl font-bold mb-4">Dashboard</h1>
+            <div className="bg-white p-6 rounded shadow mb-6">
+                <h2 className="text-xl">Welcome, <span className="font-bold text-indigo-600">{user.username}</span></h2>
+                <p className="text-gray-600">Role: {user.role}</p>
             </div>
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <p className="text-gray-500 mb-4">No upcoming trips found</p>
-            <Link
-              to="/search"
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
-            >
-              Book Your First Trip
-            </Link>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+
+            <div className="bg-white p-6 rounded shadow">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-2xl font-bold">
+                        {user.role === 'company' ? 'My Buses' : 'My Bookings'}
+                    </h3>
+                    {user.role === 'company' && (
+                        <Link to="/add-bus" className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">Add New Bus</Link>
+                    )}
+                </div>
+                {data.length === 0 ? (
+                    <p>No records found.</p>
+                ) : (
+                    <ul>
+                        {data.map(item => (
+                            <li key={item.id} className="border-b py-2">
+                                {user.role === 'company'
+                                    ? `${item.name} (${item.license_plate}) - ${item.bus_type}`
+                                    : `Trip id: ${item.id} - Status: ${item.status}`
+                                }
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </div>
+    );
 };
 
 export default Dashboard;
